@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <title>3D 태양계 탐험</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { background: #000; color: #eef3ff; font-family: system-ui, "Noto Sans KR", sans-serif; }
+    #universe { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    header { position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      width: min(560px, 94%); text-align: center; pointer-events: none; }
+    .eyebrow { color: #a9bbd9; font-size: 10px; letter-spacing: .3em; }
+    h1 { margin: 8px 0; font-size: clamp(23px, 3vw, 34px); font-weight: 650; letter-spacing: -.04em; }
+    header p { margin: 0; color: #acb8ce; font-size: 12px; line-height: 1.7; }
+    .panel { background: rgba(12, 18, 30, .82); border: 1px solid rgba(160, 187, 235, .2);
+      border-radius: 16px; backdrop-filter: blur(12px); box-shadow: 0 12px 40px #0005; }
+    #controls { position: fixed; top: 24px; right: 24px; width: 218px; padding: 18px; }
+    #controls h2 { margin: 0 0 18px; color: #acb8ce; font-size: 11px; letter-spacing: .12em; }
+    .speed-label { display: flex; justify-content: space-between; font-size: 13px; }
+    output { color: #ffc775; font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; margin: 16px 0 4px; accent-color: #ffc775; cursor: pointer; }
+    .range-labels { display: flex; justify-content: space-between; color: #8b9ab5; font-size: 10px; }
+    button { width: 100%; padding: 10px; border: 1px solid #354158; border-radius: 9px;
+      background: #1b283f; color: #eef3ff; font: inherit; font-size: 12px; cursor: pointer; }
+    button:hover { background: #293b58; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #ffc775; outline-offset: 4px; }
+    #pause { margin-top: 16px; }
+    .checkbox { display: flex; align-items: center; gap: 8px; margin: 15px 0; font-size: 12px; cursor: pointer; }
+    input[type="checkbox"] { accent-color: #ffc775; width: 16px; height: 16px; margin: 0; }
+    #info { position: fixed; bottom: 24px; left: 24px; width: min(390px, calc(100% - 48px)); padding: 18px 20px; }
+    #info .tag { color: #acb8ce; font-size: 10px; letter-spacing: .12em; }
+    #info h2 { margin: 8px 0; font-size: 20px; }
+    #info p { margin: 0; color: #bcc8dd; font-size: 13px; line-height: 1.7; }
+    #scale-note { position: fixed; right: 24px; bottom: 24px; color: #7c8ba4; font-size: 11px; pointer-events: none; }
+    #status { position: fixed; inset: 0; display: grid; place-items: center; background: #000c;
+      padding: 24px; text-align: center; z-index: 10; font-size: 15px; line-height: 1.8; }
+    #status[hidden] { display: none; }
+    @media (max-width: 1050px) {
+      header { top: 18px; }
+      #controls { top: 122px; right: 16px; width: 190px; padding: 14px; }
+    }
+    @media (max-width: 600px) {
+      header p { font-size: 11px; }
+      #controls { top: 116px; right: 12px; width: 165px; padding: 12px; }
+      #controls h2 { margin-bottom: 12px; }
+      #info { bottom: 32px; left: 12px; width: calc(100% - 24px); padding: 14px 16px; }
+      #info h2 { font-size: 18px; }
+      #info p { font-size: 12px; }
+      #scale-note { bottom: 9px; right: 12px; font-size: 10px; }
+    }
+    @media (max-height: 500px) and (min-width: 601px) {
+      header { left: 24px; transform: none; width: auto; text-align: left; }
+      #controls { top: 12px; right: 12px; }
+      #info { bottom: 12px; padding: 12px 16px; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="universe" aria-label="마우스와 터치로 탐험하는 3D 태양계"></main>
+  <header>
+    <div class="eyebrow">SOLAR SYSTEM EXPLORER</div>
+    <h1>3D 태양계 탐험</h1>
+    <p>드래그로 회전 · 휠 / 두 손가락으로 확대·축소 · 천체를 눌러 알아보기</p>
+  </header>
+  <aside id="controls" class="panel" aria-label="태양계 조작판">
+    <h2>탐험 조작판</h2>
+    <div class="speed-label">
+      <label for="speed">공전 속도</label>
+      <output id="speed-value" for="speed">1.0배</output>
+    </div>
+    <input id="speed" type="range" min="0" max="3" step="0.1" value="1">
+    <div class="range-labels"><span>0배</span><span>3배</span></div>
+    <button id="pause" type="button" aria-pressed="false">멈춤</button>
+    <label class="checkbox"><input id="orbits" type="checkbox" checked>궤도선 보이기</label>
+    <button id="reset" type="button">처음 시점으로</button>
+  </aside>
+  <section id="info" class="panel" aria-live="polite" aria-atomic="true">
+    <div class="tag">천체 알아보기</div>
+    <h2 id="info-name">태양계에 오신 것을 환영합니다</h2>
+    <p id="info-description">태양이나 행성을 클릭하면 이름과 설명이 나타납니다.</p>
+  </section>
+  <div id="scale-note">크기·거리·속도는 관찰하기 쉽게 조정했습니다.</div>
+  <div id="status" role="status">태양계를 불러오는 중입니다…</div>
+  <noscript>태양계를 보려면 브라우저에서 JavaScript를 켜주세요.</noscript>
+
+  <script type="module">
+    const status = document.getElementById('status');
+    const loadMessage = '3D 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.';
+    const loadingTimeout = setTimeout(() => { status.textContent = loadMessage; }, 20000);
+    let THREE, OrbitControls;
+    try {
+      // 동적 import로 CDN 연결 실패도 화면에 안내합니다.
+      [THREE, { OrbitControls }] = await Promise.all([
+        import('three'),
+        import('three/addons/controls/OrbitControls.js')
+      ]);
+    } catch (error) {
+      clearTimeout(loadingTimeout);
+      status.textContent = loadMessage;
+      console.error(error);
+    }
+    if (THREE && OrbitControls) {
+      try { start(); }
+      catch (error) {
+        clearTimeout(loadingTimeout);
+        status.hidden = false;
+        status.textContent = '3D 화면을 시작하지 못했습니다. WebGL을 지원하는 브라우저에서 다시 열어주세요.';
+        console.error(error);
+      }
+    }
+
+    function start() {
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+      const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 1800);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      document.getElementById('universe').appendChild(renderer.domElement);
+      const canvas = renderer.domElement;
+      const controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 12;
+      controls.maxDistance = 360;
+      controls.enablePan = true;
+      controls.rotateSpeed = 0.65;
+      controls.zoomSpeed = 0.8;
+      controls.touches.ONE = THREE.TOUCH.ROTATE;
+      controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+      controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+      canvas.addEventListener('contextmenu', event => event.preventDefault());
+
+      // 세로 화면에서도 태양계가 들어오도록 가로 시야각을 확보합니다.
+      function resize() {
+        const width = innerWidth, height = innerHeight;
+        camera.aspect = width / height;
+        camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(
+          Math.tan(THREE.MathUtils.degToRad(25)) / Math.min(camera.aspect, 1)
+        ));
+        camera.updateProjectionMatrix();
+        renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+        renderer.setSize(width, height);
+      }
+      function resetView() {
+        const distance = 74 / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+          * Math.min(camera.aspect, 1.8));
+        // reset()으로 이전 드래그에서 남은 감속도 함께 지웁니다.
+        controls.enableDamping = false;
+        controls.reset();
+        controls.target.set(0, 0, 0);
+        camera.position.copy(new THREE.Vector3(0, 0.72, 1).normalize().multiplyScalar(distance));
+        controls.update();
+        controls.enableDamping = true;
+        controls.saveState();
+      }
+      resize();
+      resetView();
+      window.addEventListener('resize', resize);
+      document.getElementById('reset').addEventListener('click', resetView);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+      const sunlight = new THREE.PointLight(0xffffff, 3, 0, 0);
+      sunlight.position.set(0, 0, 0);
+      scene.add(sunlight);
+
+      const sphere = new THREE.SphereGeometry(1, 48, 32);
+      const sun = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: 0xffb52e }));
+      sun.scale.setScalar(3.8);
+      scene.add(sun);
+      // 반투명 구체를 겹친 광채: 이미지나 텍스처를 사용하지 않습니다.
+      for (let i = 0; i < 5; i++) {
+        const glow = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({
+          color: 0xffa12c, transparent: true, opacity: 0.065 - i * 0.009,
+          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide
+        }));
+        glow.scale.setScalar(4.05 + i * 0.5);
+        scene.add(glow);
+      }
+
+      const starPositions = new Float32Array(2000 * 3);
+      for (let i = 0; i < 2000; i++) {
+        const radius = 500 + Math.random() * 300;
+        const y = Math.random() * 2 - 1;
+        const angle = Math.random() * Math.PI * 2;
+        const horizontal = Math.sqrt(1 - y * y);
+        starPositions[i * 3] = radius * horizontal * Math.cos(angle);
+        starPositions[i * 3 + 1] = radius * y;
+        starPositions[i * 3 + 2] = radius * horizontal * Math.sin(angle);
+      }
+      const starsGeometry = new THREE.BufferGeometry();
+      starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      scene.add(new THREE.Points(starsGeometry, new THREE.PointsMaterial({
+        color: 0xd9e5ff, size: 1.15, sizeAttenuation: true, transparent: true, opacity: 0.85
+      })));
+
+      const data = [
+        { name: '수성', description: '태양에 가장 가까운 작고 바위로 된 행성', color: 0xa9a29a, size: 0.65, distance: 9, speed: 0.8, spin: 0.18 },
+        { name: '금성', description: '두꺼운 대기로 둘러싸인 뜨거운 황금빛 행성', color: 0xe4be75, size: 0.95, distance: 13, speed: 0.62, spin: -0.13 },
+        { name: '지구', description: '우리가 사는 행성, 물이 있는 푸른 별', color: 0x287dde, size: 1.05, distance: 17, speed: 0.46, spin: 0.32 },
+        { name: '화성', description: '붉은 표면과 거대한 산을 가진 바위 행성', color: 0xce5535, size: 0.8, distance: 21, speed: 0.36, spin: 0.3 },
+        { name: '목성', description: '태양계에서 가장 큰 행성, 거대한 가스의 세계', color: 0xd8a06c, size: 2.5, distance: 29, speed: 0.22, spin: 0.42 },
+        { name: '토성', description: '얼음과 암석으로 이루어진 아름다운 고리를 가진 행성', color: 0xe4c887, size: 2.15, distance: 39, speed: 0.16, spin: 0.38 },
+        { name: '천왕성', description: '자전축이 크게 기울어진 청록빛 얼음 거대 행성', color: 0x76d4dc, size: 1.55, distance: 47, speed: 0.11, spin: -0.23 },
+        { name: '해왕성', description: '태양에서 가장 멀리 공전하는 짙은 푸른색 행성', color: 0x345ed3, size: 1.5, distance: 55, speed: 0.08, spin: 0.24 }
+      ];
+      const orbitGroup = new THREE.Group();
+      scene.add(orbitGroup);
+      const bodies = [];
+      const selectable = [sun];
+      const sunBody = { name: '태양', description: '태양계의 중심에서 빛과 열을 내는 별',
+        mesh: sun, materials: [sun.material], highlightUntil: 0 };
+      sun.userData.body = sunBody;
+      const orbitMaterial = new THREE.LineBasicMaterial({
+        color: 0x90a9cf, transparent: true, opacity: 0.23, depthWrite: false
+      });
+
+      // 구체의 꼭짓점 색만으로 줄무늬와 대륙 느낌을 만듭니다.
+      function planetGeometry(item) {
+        const geometry = sphere.clone();
+        const positions = geometry.attributes.position;
+        const colors = [];
+        const base = new THREE.Color(item.color);
+        for (let i = 0; i < positions.count; i++) {
+          const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
+          const longitude = Math.atan2(z, x);
+          const color = base.clone();
+          if (item.name === '목성' || item.name === '토성') {
+            color.multiplyScalar(0.8 + 0.2 * Math.sin(y * 28 + Math.sin(longitude * 3) * 0.7));
+          } else if (item.name === '지구') {
+            const land = Math.sin(longitude * 3 + y * 5) + Math.cos(longitude * 5 - y * 9);
+            if (Math.abs(y) > 0.88) color.set(0xe6f4ff);
+            else if (land > 0.65) color.set(0x3d9769);
+          } else {
+            color.multiplyScalar(0.91 + 0.09 * Math.sin(longitude * 4 + y * 12));
+          }
+          colors.push(color.r, color.g, color.b);
+        }
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        return geometry;
+      }
+
+      data.forEach((item, index) => {
+        const points = [];
+        for (let i = 0; i < 180; i++) {
+          const angle = i / 180 * Math.PI * 2;
+          points.push(new THREE.Vector3(Math.cos(angle) * item.distance, 0, Math.sin(angle) * item.distance));
+        }
+        orbitGroup.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), orbitMaterial));
+        const group = new THREE.Group();
+        const tilt = new THREE.Group();
+        tilt.rotation.z = THREE.MathUtils.degToRad(item.name === '토성' ? 27 : item.name === '천왕성' ? 98 : 8);
+        group.add(tilt);
+        scene.add(group);
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff, vertexColors: true, roughness: 0.85, metalness: 0,
+          emissive: item.color, emissiveIntensity: 0
+        });
+        const mesh = new THREE.Mesh(planetGeometry(item), material);
+        mesh.scale.setScalar(item.size);
+        tilt.add(mesh);
+        const body = { ...item, group, mesh, materials: [material],
+          angle: index * 2.399 + 0.5, highlightUntil: 0 };
+        mesh.userData.body = body;
+        selectable.push(mesh);
+        if (item.name === '토성') {
+          [[2.8, 3.45, 0xbba578], [3.55, 4.35, 0xe0c990]].forEach(([inner, outer, color]) => {
+            const ringMaterial = new THREE.MeshStandardMaterial({
+              color, roughness: 0.95, metalness: 0, side: THREE.DoubleSide,
+              transparent: true, opacity: 0.8, emissive: color, emissiveIntensity: 0
+            });
+            const ring = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 120), ringMaterial);
+            ring.rotation.x = -Math.PI / 2;
+            ring.userData.body = body;
+            tilt.add(ring);
+            body.materials.push(ringMaterial);
+            selectable.push(ring);
+          });
+        }
+        bodies.push(body);
+      });
+
+      let paused = false;
+      let orbitSpeed = 1;
+      document.getElementById('speed').addEventListener('input', event => {
+        orbitSpeed = Number(event.target.value);
+        document.getElementById('speed-value').textContent = orbitSpeed.toFixed(1) + '배';
+      });
+      document.getElementById('pause').addEventListener('click', event => {
+        paused = !paused;
+        event.currentTarget.textContent = paused ? '재생' : '멈춤';
+        event.currentTarget.setAttribute('aria-pressed', String(paused));
+      });
+      document.getElementById('orbits').addEventListener('change', event => {
+        orbitGroup.visible = event.target.checked;
+      });
+
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      function selectBody(event) {
+        const rect = canvas.getBoundingClientRect();
+        pointer.set((event.clientX - rect.left) / rect.width * 2 - 1,
+          -(event.clientY - rect.top) / rect.height * 2 + 1);
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObjects(selectable, false)[0];
+        if (!hit) return;
+        const body = hit.object.userData.body;
+        document.getElementById('info-name').textContent = body.name;
+        document.getElementById('info-description').textContent = body.name + ' - ' + body.description;
+        body.highlightUntil = performance.now() + 1200;
+      }
+
+      // 이동한 총 거리를 기록하므로 원래 자리로 돌아온 드래그도 클릭되지 않습니다.
+      const pointers = new Map();
+      let multiplePointers = false;
+      canvas.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, distance: 0 });
+        if (pointers.size > 1) multiplePointers = true;
+      }, true);
+      function trackPointer(event) {
+        const record = pointers.get(event.pointerId);
+        if (!record) return;
+        record.distance += Math.hypot(event.clientX - record.x, event.clientY - record.y);
+        record.x = event.clientX;
+        record.y = event.clientY;
+      }
+      canvas.addEventListener('pointermove', trackPointer, true);
+      canvas.addEventListener('pointerup', event => {
+        trackPointer(event);
+        const record = pointers.get(event.pointerId);
+        if (record && record.distance < 6 && !multiplePointers && event.button === 0) selectBody(event);
+        pointers.delete(event.pointerId);
+        if (!pointers.size) multiplePointers = false;
+      }, true);
+      function cancelGesture() { pointers.clear(); multiplePointers = false; }
+      canvas.addEventListener('pointercancel', cancelGesture, true);
+      canvas.addEventListener('lostpointercapture', event => {
+        pointers.delete(event.pointerId);
+        if (!pointers.size) multiplePointers = false;
+      });
+      canvas.addEventListener('wheel', () => {
+        pointers.forEach(record => { record.distance = Infinity; });
+      }, { passive: true });
+      window.addEventListener('blur', cancelGesture);
+
+      const clock = new THREE.Clock();
+      const sunColor = sun.material.color.clone();
+      const brightSunColor = new THREE.Color(0xfff3c1);
+      function animate() {
+        const delta = Math.min(clock.getDelta(), 0.05);
+        const now = performance.now();
+        for (const body of bodies) {
+          if (!paused) {
+            body.angle = (body.angle + delta * body.speed * orbitSpeed) % (Math.PI * 2);
+            body.mesh.rotation.y += delta * body.spin;
+          }
+          body.group.position.set(Math.cos(body.angle) * body.distance, 0, Math.sin(body.angle) * body.distance);
+          const highlight = Math.max(0, (body.highlightUntil - now) / 1200);
+          body.materials.forEach(material => { material.emissiveIntensity = highlight * 1.3; });
+        }
+        const sunHighlight = Math.max(0, (sunBody.highlightUntil - now) / 1200);
+        sun.material.color.copy(sunColor).lerp(brightSunColor, sunHighlight);
+        if (!paused) sun.rotation.y += delta * 0.12;
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      animate();
+      renderer.setAnimationLoop(animate);
+      clearTimeout(loadingTimeout);
+      status.hidden = true;
+      canvas.addEventListener('webglcontextlost', event => {
+        event.preventDefault();
+        renderer.setAnimationLoop(null);
+        status.textContent = '3D 화면 연결이 끊겼습니다. 페이지를 새로고침해주세요.';
+        status.hidden = false;
+      });
+    }
+  </script>
+</body>
+</html>
