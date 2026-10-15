@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101210">
+    <meta name="robots" content="noindex,nofollow">
+    <title>문의 관리자 | 헬스장 이름</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/js/storage.js" defer></script>
+    <script src="/js/admin.js" defer></script>
+  </head>
+  <body class="admin-page">
+    <header class="admin-header">
+      <a class="brand" href="/" aria-label="헬스장 소개 페이지로 이동">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>헬스장 이름</strong><small>INQUIRY ADMIN</small></span>
+      </a>
+      <a class="back-link" href="/">← 소개 페이지</a>
+    </header>
+    <main class="admin-main">
+      <p class="admin-kicker">LOCAL PROTOTYPE / ADMIN</p>
+      <h1 class="admin-title">문의 관리</h1>
+      <p class="admin-subtitle">같은 브라우저에서 등록한 테스트 문의를 확인하고 정리하세요.</p>
+      <div class="admin-notice"><strong>테스트 전용</strong> · 문의는 이 브라우저에만 저장됩니다. 실제 고객 정보는 입력하지 마세요. 비밀번호 잠금은 시제품용이며 보안 기능이 아닙니다.</div>
+
+      <section class="access-card" id="access-panel" aria-labelledby="access-title">
+        <h2 id="access-title">관리자 확인</h2>
+        <p>시제품 비밀번호를 입력하면 문의 목록을 볼 수 있어요.</p>
+        <form class="access-form" id="access-form">
+          <label for="admin-code">비밀번호</label>
+          <div class="access-row"><input id="admin-code" name="code" type="password" inputmode="numeric" autocomplete="off" aria-describedby="access-error" required><button type="submit">확인 <span aria-hidden="true">↗</span></button></div>
+          <p class="access-error" id="access-error" role="alert" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="admin-workspace" id="admin-workspace" hidden aria-labelledby="list-title">
+        <div class="admin-toolbar"><div><h2 id="list-title">전체 문의</h2><span class="admin-count"><strong id="inquiry-count">0</strong>건</span></div><span class="admin-sort">SORTED BY LATEST ↓</span></div>
+        <div class="admin-storage-error" id="storage-error" role="alert" hidden></div>
+        <div class="inquiry-list" id="inquiry-list" aria-live="polite"></div>
+      </section>
+      <footer class="admin-footer"><span>LOCAL ONLY · DATA STAYS IN THIS BROWSER</span><a href="/">랜딩페이지로 돌아가기</a></footer>
+    </main>
+  </body>
+</html>
